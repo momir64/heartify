@@ -51,14 +51,14 @@ function extractTrackUri(linkElement) {
 }
 
 function getTracks() {
-    const section = document.querySelector("section[data-testid='playlist-page']");
+    const section = document.querySelector(playlistPageSelector);
     if (!section) return [];
 
     return Array.from(
-        section.querySelectorAll("div > div > div > div > div > div > div[data-testid='tracklist-row']")
+        section.querySelectorAll("div > ".repeat(7) + "div[data-testid='tracklist-row']")
     ).map(row => {
         const link = row.querySelector("a[href^='/track/']");
-        const addBtn = row.querySelector("button[aria-label='Add to playlist']");
+        const addBtn = row.querySelector("button[aria-label='Add to playlist'], button[aria-label='Add to Liked Songs']");
         const uri = extractTrackUri(link);
         return { row, addBtn, uri };
     }).filter(track => track.addBtn && track.uri);
@@ -81,18 +81,19 @@ function updateTrackButton(track, saved, authToken, clientToken) {
         heart.style.cursor = "pointer";
 
         if (!saved) heart.style.opacity = "0";
-        addBtn.parentElement.parentElement.onmouseenter = () => { if (!saved) heart.style.opacity = "1"; };
+        addBtn.parentElement.parentElement.onmouseenter = () => { if (!saved) heart.style.opacity = ""; };
         addBtn.parentElement.parentElement.onmouseleave = () => { if (!saved) heart.style.opacity = "0"; };
 
         heart.onclick = async () => {
             if (saved) {
                 await removeFromSaved(uri, authToken, clientToken);
+                heart.style.opacity = addBtn.parentElement.parentElement.matches(':hover') ? "" : "0";
                 heart.src = heartOutline;
             } else {
                 await addToSaved(uri, authToken, clientToken);
+                heart.style.opacity = "";
                 heart.src = heartFilled;
             }
-            heart.style.opacity = "1";
             saved = !saved;
         };
 
