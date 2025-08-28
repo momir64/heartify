@@ -119,11 +119,11 @@ let processTimeout;
 let currentSection = null;
 const heartOutline = browser.runtime.getURL("heart.svg");
 const heartFilled = browser.runtime.getURL("heart_filled.svg");
+const trackLinkSelector = "a[data-testid='internal-track-link']";
 const playlistPageSelector = "section[data-testid='playlist-page']";
 
 function debounceProcess() {
     clearTimeout(processTimeout);
-    // processTimeout = setTimeout(() => { console.log("change"); }, 300);
     processTimeout = setTimeout(processTracks, 200);
 }
 
@@ -135,17 +135,13 @@ function observeSection(section) {
         for (const mutation of mutations) {
             if (mutation.type === "childList") {
                 for (const node of mutation.addedNodes) {
-                    if (node.nodeType !== 1) continue;
-                    if (node.matches?.("a[data-testid='internal-track-link']") ||
-                        node.querySelector?.("a[data-testid='internal-track-link']")) {
+                    if (node.nodeType === 1 && (node.matches?.(trackLinkSelector) || node.querySelector?.(trackLinkSelector))) {
                         debounceProcess();
                         return;
                     }
                 }
             }
-            if (mutation.type === "attributes"
-                && mutation.target.matches("a[data-testid='internal-track-link']")
-                && mutation.attributeName === "href") {
+            if (mutation.type === "attributes" && mutation.target.matches(trackLinkSelector) && mutation.attributeName === "href") {
                 debounceProcess();
                 return;
             }
@@ -159,8 +155,7 @@ const bodyObserver = new MutationObserver(mutations => {
     for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
             if (node.nodeType !== 1) continue;
-            const section = node.matches?.(playlistPageSelector)
-                ? node : node.querySelector?.(playlistPageSelector);
+            const section = node.matches?.(playlistPageSelector) ? node : node.querySelector?.(playlistPageSelector);
             if (section) observeSection(section);
         }
     }
