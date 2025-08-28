@@ -1,0 +1,49 @@
+{
+    "manifest_version": 3,
+    "name": "Heartify",
+    "version": "1.0",
+    "description": "Returns hearts back to Spotify playlists!",
+    "icons": {
+        "48": "heart_filled.svg"
+    },
+    "permissions": [
+        "webRequest",
+        "scripting",
+        "storage"
+    ],
+    "host_permissions": [
+        "https://open.spotify.com/*",
+        "https://api-partner.spotify.com/*"
+    ],
+    "background": {
+        "scripts": [
+            "background.js"
+        ]
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://open.spotify.com/playlist/*"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "heart.svg",
+                "heart_filled.svg"
+            ],
+            "matches": [
+                "https://open.spotify.com/*"
+            ]
+        }
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "@heartify"
+        }
+    }
+}
