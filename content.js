@@ -99,7 +99,10 @@ function updateTrackButton(track, saved, authToken, clientToken) {
 
         addBtn.parentElement.prepend(heart);
     } else {
+        existingBtn.style.opacity = saved ? "" : "0";
         existingBtn.src = saved ? heartFilled : heartOutline;
+        addBtn.parentElement.parentElement.onmouseenter = () => { if (!saved) existingBtn.style.opacity = ""; };
+        addBtn.parentElement.parentElement.onmouseleave = () => { if (!saved) existingBtn.style.opacity = "0"; };
     }
 }
 
@@ -164,3 +167,8 @@ const bodyObserver = new MutationObserver(mutations => {
 
 bodyObserver.observe(document.body, { childList: true, subtree: true });
 observeSection(document.querySelector(playlistPageSelector));
+
+browser.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "debounceProcess")
+        debounceProcess();
+});

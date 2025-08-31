@@ -18,3 +18,22 @@ browser.webRequest.onBeforeSendHeaders.addListener(
     { urls: ["https://api-partner.spotify.com/*"] },
     ["requestHeaders"]
 );
+
+
+browser.webRequest.onBeforeRequest.addListener(
+    async (details) => {
+        if (details.method === "POST" && details.requestBody?.raw?.[0]?.bytes) {
+            const decoder = new TextDecoder("utf-8");
+            const bodyString = decoder.decode(details.requestBody.raw[0].bytes);
+            try {
+                const op = JSON.parse(bodyString).operationName;
+                if (op && op !== "areEntitiesInLibrary")
+                    browser.tabs.sendMessage(details.tabId, { type: "debounceProcess" });
+            } catch (e) {
+                console.error("Failed to parse request body", e);
+            }
+        }
+    },
+    { urls: ["https://api-partner.spotify.com/pathfinder/v2/query"] },
+    ["requestBody"]
+);
