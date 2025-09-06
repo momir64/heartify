@@ -7,14 +7,15 @@ async function spotifyRequest(trackUris, authToken, clientToken, operationName) 
     const sha256Hash = operationName === "areEntitiesInLibrary" ?
         "134337999233cc6fdd6b1e6dbf94841409f04a946c5c7b744b09ba0dfe5a85ed" :
         "a3c1ff58e6a36fec5fe1e3a193dc95d9071d96b9ba53c5ba9c1494fb1ee73915";
+    const headers = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "app-platform": "WebPlayer"
+    };
+    if (authToken) headers["authorization"] = `Bearer ${authToken}`;
+    if (clientToken) headers["client-token"] = clientToken;
     const res = await fetch("https://api-partner.spotify.com/pathfinder/v2/query", {
         credentials: "include",
-        headers: {
-            "Content-Type": "application/json;charset=UTF-8",
-            "app-platform": "WebPlayer",
-            "authorization": `Bearer ${authToken}`,
-            "client-token": clientToken
-        },
+        headers,
         body: JSON.stringify({
             variables: { uris: trackUris },
             operationName,
@@ -99,7 +100,7 @@ function updateTrackButton(track, saved, authToken, clientToken) {
 
         addBtn.parentElement.prepend(heart);
     } else {
-        existingBtn.style.opacity = saved ? "" : "0";
+        existingBtn.style.opacity = saved || addBtn.parentElement.parentElement.matches(":hover") ? "" : "0";
         existingBtn.src = saved ? heartFilled : heartOutline;
         addBtn.parentElement.parentElement.onmouseenter = () => { if (!saved) existingBtn.style.opacity = ""; };
         addBtn.parentElement.parentElement.onmouseleave = () => { if (!saved) existingBtn.style.opacity = "0"; };
@@ -109,8 +110,6 @@ function updateTrackButton(track, saved, authToken, clientToken) {
 async function processTracks() {
     console.log("Processing tracks...");
     const { authToken, clientToken } = await getTokens();
-    if (!authToken || !clientToken) return;
-
     const tracks = getTracks();
     if (!tracks.length) return;
 

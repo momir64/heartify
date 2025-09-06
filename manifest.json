@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Heartify",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Returns hearts back to Spotify playlists!",
     "icons": {
         "48": "heart_filled.svg"

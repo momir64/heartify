@@ -10,9 +10,7 @@ browser.webRequest.onBeforeSendHeaders.addListener(
                 if (header.name.toLowerCase() === "client-token")
                     clientToken = header.value;
             }
-
-            if (authToken && clientToken)
-                browser.storage.local.set({ authToken, clientToken });
+            browser.storage.local.set({ authToken, clientToken });
         }
     },
     { urls: ["https://api-partner.spotify.com/*"] },
