@@ -26,7 +26,7 @@ browser.webRequest.onBeforeRequest.addListener(
             try {
                 const op = JSON.parse(bodyString).operationName;
                 if (op && op !== "areEntitiesInLibrary")
-                    browser.tabs.sendMessage(details.tabId, { type: "debounceProcess" });
+                    browser.tabs.sendMessage(details.tabId, { type: "refreshNeeded" });
             } catch (e) {
                 console.error("Failed to parse request body", e);
             }

@@ -51,29 +51,40 @@ function extractTrackUri(linkElement) {
     return `spotify:track:${href.split("/track/")[1].split("?")[0]}`;
 }
 
+const heartBtnClass = "heart-btn";
+const heartOutline = browser.runtime.getURL("/assets/heart_unfilled.svg");
+const heartFilled = browser.runtime.getURL("/assets/heart_filled.svg");
+const trackRowSelector = "div[data-testid='tracklist-row']";
+const trackLinkSelector = "a[data-testid='internal-track-link']";
+const playlistPageSelector = "section[data-testid='playlist-page']";
+const albumPageSelector = "section[data-testid='album-page']";
+const artistPageSelector = "section[data-testid='artist-page']";
+const supportedSections = [playlistPageSelector, albumPageSelector, artistPageSelector];
+const addToPlaylistBtnSelector = "button[aria-label='Add to playlist']";
+const addToLikedSongsBtnSelector = "button[aria-label='Add to Liked Songs']";
+const addBtnSelector = `${addToPlaylistBtnSelector}, ${addToLikedSongsBtnSelector}`;
+
 function getTracks() {
-    const section = document.querySelector(playlistPageSelector);
+    const section = supportedSections.map(selector => document.querySelector(selector)).find(Boolean);
     if (!section) return [];
 
     return Array.from(
-        section.querySelectorAll("div > ".repeat(7) + "div[data-testid='tracklist-row']")
+        section.querySelectorAll("div > ".repeat(7) + trackRowSelector)
     ).map(row => {
-        const link = row.querySelector("a[href^='/track/']");
-        const addBtn = row.querySelector("button[aria-label='Add to playlist'], button[aria-label='Add to Liked Songs']");
+        const link = row.querySelector(trackLinkSelector);
+        const addBtn = row.querySelector(addBtnSelector);
         const uri = extractTrackUri(link);
         return { row, addBtn, uri };
     }).filter(track => track.addBtn && track.uri);
 }
 
-function updateTrackButton(track, saved, authToken, clientToken) {
+function updateHeartButton(track, saved, authToken, clientToken) {
     const { addBtn, row, uri } = track;
-    addBtn.style.pointerEvents = "none";
-    addBtn.style.opacity = "0";
 
-    let existingBtn = row.querySelector(".heart-btn");
+    let existingBtn = row.querySelector(`.${heartBtnClass}`);
     if (!existingBtn) {
         const heart = document.createElement("img");
-        heart.className = "heart-btn";
+        heart.className = heartBtnClass;
         heart.src = saved ? heartFilled : heartOutline;
         heart.style.position = "absolute";
         heart.style.right = "90px";
@@ -82,13 +93,13 @@ function updateTrackButton(track, saved, authToken, clientToken) {
         heart.style.cursor = "pointer";
 
         if (!saved) heart.style.opacity = "0";
-        addBtn.parentElement.parentElement.onmouseenter = () => { if (!saved) heart.style.opacity = ""; };
-        addBtn.parentElement.parentElement.onmouseleave = () => { if (!saved) heart.style.opacity = "0"; };
+        row.onmouseenter = () => { if (!saved) heart.style.opacity = ""; };
+        row.onmouseleave = () => { if (!saved) heart.style.opacity = "0"; };
 
         heart.onclick = async () => {
             if (saved) {
                 await removeFromSaved(uri, authToken, clientToken);
-                heart.style.opacity = addBtn.parentElement.parentElement.matches(':hover') ? "" : "0";
+                heart.style.opacity = row.matches(':hover') ? "" : "0";
                 heart.src = heartOutline;
             } else {
                 await addToSaved(uri, authToken, clientToken);
@@ -100,30 +111,26 @@ function updateTrackButton(track, saved, authToken, clientToken) {
 
         addBtn.parentElement.prepend(heart);
     } else {
-        existingBtn.style.opacity = saved || addBtn.parentElement.parentElement.matches(":hover") ? "" : "0";
+        existingBtn.style.opacity = saved || row.matches(":hover") ? "" : "0";
         existingBtn.src = saved ? heartFilled : heartOutline;
-        addBtn.parentElement.parentElement.onmouseenter = () => { if (!saved) existingBtn.style.opacity = ""; };
-        addBtn.parentElement.parentElement.onmouseleave = () => { if (!saved) existingBtn.style.opacity = "0"; };
+        row.onmouseenter = () => { if (!saved) existingBtn.style.opacity = ""; };
+        row.onmouseleave = () => { if (!saved) existingBtn.style.opacity = "0"; };
     }
 }
 
 async function processTracks() {
     console.log("Processing tracks...");
-    const { authToken, clientToken } = await getTokens();
     const tracks = getTracks();
     if (!tracks.length) return;
 
+    const { authToken, clientToken } = await getTokens();
     const savedStatus = await checkIfSavedBatch(tracks.map(t => t.uri), authToken, clientToken);
-    tracks.forEach((track, i) => updateTrackButton(track, savedStatus[i], authToken, clientToken));
+    tracks.forEach((track, i) => updateHeartButton(track, savedStatus[i], authToken, clientToken));
 }
 
 
 let processTimeout;
 let currentSection = null;
-const heartOutline = browser.runtime.getURL("heart.svg");
-const heartFilled = browser.runtime.getURL("heart_filled.svg");
-const trackLinkSelector = "a[data-testid='internal-track-link']";
-const playlistPageSelector = "section[data-testid='playlist-page']";
 
 function debounceProcess() {
     clearTimeout(processTimeout);
@@ -157,17 +164,41 @@ function observeSection(section) {
 const bodyObserver = new MutationObserver(mutations => {
     for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-            if (node.nodeType !== 1) continue;
-            const section = node.matches?.(playlistPageSelector) ? node : node.querySelector?.(playlistPageSelector);
+            if (node.nodeType !== Node.ELEMENT_NODE) continue;
+            let section = null;
+            for (const selector of supportedSections) {
+                section = node.matches?.(selector) ? node : node.querySelector?.(selector);
+                if (section) break;
+            }
             if (section) observeSection(section);
         }
     }
 });
 
 bodyObserver.observe(document.body, { childList: true, subtree: true });
-observeSection(document.querySelector(playlistPageSelector));
+for (const selector of supportedSections) {
+    const section = document.querySelector(selector);
+    if (section) observeSection(section);
+}
 
 browser.runtime.onMessage.addListener((msg) => {
-    if (msg.type === "debounceProcess")
+    if (msg.type === "refreshNeeded")
         debounceProcess();
 });
+
+const collectionBtnObserver = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                [node, ...node.querySelectorAll?.(addBtnSelector) || []].forEach(btn => {
+                    if (btn.matches?.(addBtnSelector)) {
+                        btn.style.pointerEvents = "none";
+                        btn.style.opacity = "0";
+                    }
+                });
+            }
+        });
+    });
+});
+
+collectionBtnObserver.observe(document.body, { childList: true, subtree: true });
