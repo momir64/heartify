@@ -69,13 +69,18 @@ function getTracks() {
     if (!section) return [];
 
     return Array.from(
-        section.querySelectorAll("div > ".repeat(7) + trackRowSelector)
+        section.querySelectorAll("div > ".repeat(6) + trackRowSelector)
     ).map(row => {
         const link = row.querySelector(trackLinkSelector);
         const addBtn = row.querySelector(addBtnSelector);
         const uri = extractTrackUri(link);
         return { row, addBtn, uri };
     }).filter(track => track.addBtn && track.uri);
+}
+
+function setHoverBehavior(row, button, saved) {
+    row.onmouseenter = () => { if (!saved) button.style.opacity = ""; };
+    row.onmouseleave = () => { if (!saved) button.style.opacity = "0"; };
 }
 
 function updateHeartButton(track, saved, authToken, clientToken) {
@@ -93,11 +98,12 @@ function updateHeartButton(track, saved, authToken, clientToken) {
         heart.style.cursor = "pointer";
 
         if (!saved) heart.style.opacity = "0";
-        row.onmouseenter = () => { if (!saved) heart.style.opacity = ""; };
-        row.onmouseleave = () => { if (!saved) heart.style.opacity = "0"; };
+        setHoverBehavior(row, heart, saved);
 
         heart.onclick = async () => {
-            if (saved) {
+            saved = !saved;
+            setHoverBehavior(row, heart, saved);
+            if (!saved) {
                 await removeFromSaved(uri, authToken, clientToken);
                 heart.style.opacity = row.matches(':hover') ? "" : "0";
                 heart.src = heartOutline;
@@ -106,15 +112,13 @@ function updateHeartButton(track, saved, authToken, clientToken) {
                 heart.style.opacity = "";
                 heart.src = heartFilled;
             }
-            saved = !saved;
         };
 
         addBtn.parentElement.prepend(heart);
     } else {
         existingBtn.style.opacity = saved || row.matches(":hover") ? "" : "0";
         existingBtn.src = saved ? heartFilled : heartOutline;
-        row.onmouseenter = () => { if (!saved) existingBtn.style.opacity = ""; };
-        row.onmouseleave = () => { if (!saved) existingBtn.style.opacity = "0"; };
+        setHoverBehavior(row, heart, saved);
     }
 }
 
