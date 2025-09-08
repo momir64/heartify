@@ -118,7 +118,7 @@ function updateHeartButton(track, saved, authToken, clientToken) {
     } else {
         existingBtn.style.opacity = saved || row.matches(":hover") ? "" : "0";
         existingBtn.src = saved ? heartFilled : heartOutline;
-        setHoverBehavior(row, heart, saved);
+        setHoverBehavior(row, existingBtn, saved);
     }
 }
 
