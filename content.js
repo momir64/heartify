@@ -32,9 +32,13 @@ async function spotifyRequest(trackUris, authToken, clientToken, operationName) 
     return res.json();
 }
 
+const cache = new Map();
+
 async function checkIfSavedBatch(trackUris, authToken, clientToken) {
     const json = await spotifyRequest(trackUris, authToken, clientToken, "areEntitiesInLibrary");
-    return json?.data?.lookup?.map(item => item?.data?.saved ?? false) ?? [];
+    const statuses = json?.data?.lookup?.map(item => item?.data?.saved ?? false) ?? [];
+    trackUris.forEach((uri, i) => cache.set(uri, statuses[i]));
+    return statuses;
 }
 
 async function addToSaved(trackUri, authToken, clientToken) {
@@ -124,10 +128,12 @@ function updateHeartButton(track, saved, authToken, clientToken) {
 
 async function processTracks() {
     console.log("Processing tracks...");
-    const tracks = getTracks();
+    let tracks = getTracks();
     if (!tracks.length) return;
 
     const { authToken, clientToken } = await getTokens();
+    tracks.filter(t => cache.has(t.uri)).forEach(t => updateHeartButton(t, cache.get(t.uri), authToken, clientToken));
+
     const savedStatus = await checkIfSavedBatch(tracks.map(t => t.uri), authToken, clientToken);
     tracks.forEach((track, i) => updateHeartButton(track, savedStatus[i], authToken, clientToken));
 }
@@ -138,7 +144,7 @@ let currentSection = null;
 
 function debounceProcess() {
     clearTimeout(processTimeout);
-    processTimeout = setTimeout(processTracks, 200);
+    processTimeout = setTimeout(processTracks, 50);
 }
 
 function observeSection(section) {
@@ -186,8 +192,10 @@ for (const selector of supportedSections) {
 }
 
 browser.runtime.onMessage.addListener((msg) => {
-    if (msg.type === "refreshNeeded")
+    if (msg.type === "refreshNeeded") {
+        cache.clear();
         debounceProcess();
+    }
 });
 
 const collectionBtnObserver = new MutationObserver(mutations => {
