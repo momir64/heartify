@@ -158,10 +158,35 @@ async function processTracks() {
     tracks.forEach((track, i) => updateHeartButton(track, savedStatus[i], authToken, clientToken));
 }
 
-let processTimeout;
-function debounceProcess() {
-    clearTimeout(processTimeout);
-    processTimeout = setTimeout(processTracks, 50);
+// Right side panel with currently playing track has to be opened to be able to determine current track uri
+function processCurrentTrack(useCache = true) {
+    const playingTrackLink = document.querySelector(playingTrackLinkSelector);
+    const widget = document.querySelector(playingTrackWidgetSelector);
+    const trackUri = extractTrackUri(playingTrackLink);
+    if (playingTrackLink && widget && trackUri) {
+        getTokens().then(({ authToken, clientToken }) => {
+            if (useCache && cache.has(trackUri)) updateWidgetHeartButton(widget, trackUri, cache.get(trackUri), authToken, clientToken);
+            else checkIfSavedBatch([trackUri], authToken, clientToken).then(statuses => {
+                updateWidgetHeartButton(widget, trackUri, statuses[0], authToken, clientToken);
+            });
+        });
+    } else if (!playingTrackLink && widget) {
+        let heart = widget.querySelector(`.${heartBtnClass}`);
+        if (heart) {
+            heart.style.pointerEvents = "none";
+            heart.style.opacity = "0";
+        }
+    }
+}
+
+const debouncedProcessTracks = debounce(processTracks);
+const debouncedProcessCurrentTrack = debounce(processCurrentTrack);
+function debounce(func, delay = 50) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
 }
 
 let currentSection = null;
@@ -174,12 +199,12 @@ function observeSection(node) {
                 if (type === "childList") {
                     for (const node of addedNodes) {
                         if (node.nodeType === Node.ELEMENT_NODE && (node.matches?.(trackLinkSelector) || node.querySelector?.(trackLinkSelector))) {
-                            debounceProcess();
+                            debouncedProcessTracks();
                             return;
                         }
                     }
                 } else if (type === "attributes" && target.matches(trackLinkSelector) && attributeName === "href") {
-                    debounceProcess();
+                    debouncedProcessTracks();
                     return;
                 }
             }
@@ -198,34 +223,13 @@ function hideCollectionButtons(node) {
     });
 }
 
-// Right side panel with currently playing track has to be opened to be able to determine current track uri
-function processCurrentTrack(useCache = true) {
-    const playingTrackLink = document.querySelector(playingTrackLinkSelector);
-    const widget = document.querySelector(playingTrackWidgetSelector);
-    const trackUri = extractTrackUri(playingTrackLink);
-    if (playingTrackLink && widget && trackUri) {
-        getTokens().then(({ authToken, clientToken }) => {
-            if (useCache && cache.has(trackUri)) updateWidgetHeartButton(widget, trackUri, cache.get(trackUri), authToken, clientToken);
-            if (!useCache) checkIfSavedBatch([trackUri], authToken, clientToken).then(statuses => {
-                updateWidgetHeartButton(widget, trackUri, statuses[0], authToken, clientToken);
-            });
-        });
-    } else if (!playingTrackLink && widget) {
-        let heart = widget.querySelector(`.${heartBtnClass}`);
-        if (heart) {
-            heart.style.pointerEvents = "none";
-            heart.style.opacity = "0";
-        }
-    }
-}
-
 const bodyObserver = new MutationObserver(mutations => {
     for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
             if (node.nodeType !== Node.ELEMENT_NODE) continue;
             observeSection(node);
             hideCollectionButtons(node);
-            processCurrentTrack();
+            debouncedProcessCurrentTrack();
         }
     }
 });
@@ -235,7 +239,7 @@ bodyObserver.observe(document.body, { childList: true, subtree: true });
 browser.runtime.onMessage.addListener((msg) => {
     if (msg.type === "refreshNeeded") {
         cache.clear();
-        debounceProcess();
-        processCurrentTrack(false);
+        debouncedProcessTracks();
+        debouncedProcessCurrentTrack(false);
     }
 });
