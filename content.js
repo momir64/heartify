@@ -63,21 +63,20 @@ const heartFilled = browser.runtime.getURL("/assets/heart_filled.svg");
 const playingTrackLinkSelector = "a[data-testid='context-link']";
 const playingTrackWidgetSelector = "div[data-testid='now-playing-widget']";
 const trackRowSelector = "div[data-testid='tracklist-row']";
-const trackLinkSelector = "a[data-testid='internal-track-link']";
+const trackLinkSelector = "a[href^='/track/']";
 const playlistPageSelector = "section[data-testid='playlist-page']";
 const albumPageSelector = "section[data-testid='album-page']";
 const artistPageSelector = "section[data-testid='artist-page']";
-const supportedSections = [playlistPageSelector, albumPageSelector, artistPageSelector];
+const searchTracksSelector = "section[data-testid='search-tracks-result']";
+const trackListSelector = "div[data-testid='track-list']";
+const supportedSections = [playlistPageSelector, albumPageSelector, artistPageSelector, searchTracksSelector, trackListSelector];
 const addToPlaylistBtnSelector = "button[aria-label='Add to playlist']";
 const addToLikedSongsBtnSelector = "button[aria-label='Add to Liked Songs']";
 const addBtnSelector = `${addToPlaylistBtnSelector}, ${addToLikedSongsBtnSelector}`;
 
 function getTracks() {
-    const section = supportedSections.map(selector => document.querySelector(selector)).find(Boolean);
-    if (!section) return [];
-
     return Array.from(
-        section.querySelectorAll("div > ".repeat(6) + trackRowSelector)
+        document.querySelectorAll(trackRowSelector)
     ).map(row => {
         const link = row.querySelector(trackLinkSelector);
         const addBtn = row.querySelector(addBtnSelector);
@@ -147,7 +146,6 @@ function updateWidgetHeartButton(widget, uri, saved, authToken, clientToken) {
 }
 
 async function processTracks() {
-    console.log("Processing tracks...");
     let tracks = getTracks();
     if (!tracks.length) return;
 
