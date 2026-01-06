@@ -208,6 +208,7 @@ function observeSection(node) {
             }
         });
         observer.observe(section, { attributes: true, childList: true, subtree: true, attributeFilter: ["href"] });
+        debouncedProcessTracks();
     }
 }
 
