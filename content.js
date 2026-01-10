@@ -1,5 +1,7 @@
+const api = typeof browser !== 'undefined' ? browser : chrome;
+
 async function getTokens() {
-    return await browser.storage.local.get(["authToken", "clientToken"]);
+    return await api.storage.local.get(["authToken", "clientToken"]);
 }
 
 async function spotifyRequest(trackUris, authToken, clientToken, operationName) {
@@ -58,10 +60,11 @@ function extractTrackUri(linkElement) {
 }
 
 const heartBtnClass = "heart-btn";
-const heartOutline = browser.runtime.getURL("/assets/heart_unfilled.svg");
-const heartFilled = browser.runtime.getURL("/assets/heart_filled.svg");
+const heartOutline = api.runtime.getURL("/assets/heart_unfilled.svg");
+const heartFilled = api.runtime.getURL("/assets/heart_filled.svg");
 const playingTrackLinkSelector = "a[data-testid='context-link']";
 const playingTrackWidgetSelector = "div[data-testid='now-playing-widget']";
+const panelSelector = "div[data-testid='NPV_Panel_OpenDiv'] > :first-child > div > :last-child";
 const trackRowSelector = "div[data-testid='tracklist-row']";
 const trackLinkSelector = "a[href^='/track/']";
 const playlistPageSelector = "section[data-testid='playlist-page']";
@@ -106,13 +109,14 @@ function setClickBehavior(row, button, saved, uri, authToken, clientToken) {
     };
 }
 
-function setHeartAttributes(heart, saved, visible = false) {
+function setHeartAttributes(heart, saved, visible = false, changeHeight = true) {
     heart.src = saved ? heartFilled : heartOutline;
     heart.className = heartBtnClass;
     heart.style.pointerEvents = "";
     heart.style.cursor = "pointer";
-    heart.style.height = "18px";
     heart.style.width = "19px";
+    heart.style.zIndex = "0";
+    if (changeHeight) heart.style.height = "18px";
     heart.style.opacity = visible || saved ? "" : "0";
 }
 
@@ -145,6 +149,21 @@ function updateWidgetHeartButton(widget, uri, saved, authToken, clientToken) {
     setHeartAttributes(heart, saved, true); // always visible in widget
 }
 
+function updatePanelHeartButton(panel, uri, saved, authToken, clientToken) {
+    let heartDiv = panel.lastElementChild;
+    heartDiv.style.alignItems = "center";
+    heartDiv.style.display = "flex";
+
+    let heart = heartDiv.querySelector(`.${heartBtnClass}`);
+    if (!heart) {
+        heart = document.createElement("img");
+        heartDiv.prepend(heart);
+    }
+
+    setClickBehavior(null, heart, saved, uri, authToken, clientToken);
+    setHeartAttributes(heart, saved, true, false); // always visible in panel, use slightly larger heart
+}
+
 async function processTracks() {
     let tracks = getTracks();
     if (!tracks.length) return;
@@ -160,12 +179,17 @@ async function processTracks() {
 function processCurrentTrack(useCache = true) {
     const playingTrackLink = document.querySelector(playingTrackLinkSelector);
     const widget = document.querySelector(playingTrackWidgetSelector);
+    const panel = document.querySelector(panelSelector);
     const trackUri = extractTrackUri(playingTrackLink);
     if (playingTrackLink && widget && trackUri) {
         getTokens().then(({ authToken, clientToken }) => {
-            if (useCache && cache.has(trackUri)) updateWidgetHeartButton(widget, trackUri, cache.get(trackUri), authToken, clientToken);
+            if (useCache && cache.has(trackUri)) {
+                updateWidgetHeartButton(widget, trackUri, cache.get(trackUri), authToken, clientToken);
+                updatePanelHeartButton(panel, trackUri, cache.get(trackUri), authToken, clientToken);
+            }
             else checkIfSavedBatch([trackUri], authToken, clientToken).then(statuses => {
                 updateWidgetHeartButton(widget, trackUri, statuses[0], authToken, clientToken);
+                updatePanelHeartButton(panel, trackUri, statuses[0], authToken, clientToken);
             });
         });
     } else if (!playingTrackLink && widget) {
@@ -235,7 +259,7 @@ const bodyObserver = new MutationObserver(mutations => {
 
 bodyObserver.observe(document.body, { childList: true, subtree: true });
 
-browser.runtime.onMessage.addListener((msg) => {
+api.runtime.onMessage.addListener((msg) => {
     if (msg.type === "refreshNeeded") {
         cache.clear();
         debouncedProcessTracks();

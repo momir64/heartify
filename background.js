@@ -1,7 +1,8 @@
-let authToken = null;
+const api = typeof browser !== 'undefined' ? browser : chrome;
 let clientToken = null;
+let authToken = null;
 
-browser.webRequest.onBeforeSendHeaders.addListener(
+api.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
         if (details.url.includes("api-partner.spotify.com/pathfinder/v2/query")) {
             for (const header of details.requestHeaders) {
@@ -10,22 +11,27 @@ browser.webRequest.onBeforeSendHeaders.addListener(
                 if (header.name.toLowerCase() === "client-token")
                     clientToken = header.value;
             }
-            browser.storage.local.set({ authToken, clientToken });
+            api.storage.local.set({ authToken, clientToken });
         }
     },
     { urls: ["https://api-partner.spotify.com/*"] },
     ["requestHeaders"]
 );
 
-browser.webRequest.onBeforeRequest.addListener(
+api.webRequest.onBeforeRequest.addListener(
     async (details) => {
         if (details.method === "POST" && details.requestBody?.raw?.[0]?.bytes) {
             const decoder = new TextDecoder("utf-8");
             const bodyString = decoder.decode(details.requestBody.raw[0].bytes);
             try {
                 const operationName = JSON.parse(bodyString).operationName;
-                if (operationName && operationName === "libraryV3")
-                    browser.tabs.sendMessage(details.tabId, { type: "refreshNeeded" });
+                if (operationName && operationName === "libraryV3") {
+                    try {
+                        await api.tabs.sendMessage(details.tabId, { type: "refreshNeeded" });
+                    } catch (e) {
+                        console.log("Could not send message to tab", details.tabId);
+                    }
+                }
             } catch (e) {
                 console.error("Failed to parse request body", e);
             }
