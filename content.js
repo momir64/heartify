@@ -1,5 +1,12 @@
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
+let currentTrackUri = null;
+window.addEventListener("message", (e) => {
+    if (e.source !== window || e.data?.source !== "spotify-heart-ext") return;
+    currentTrackUri = e.data.trackUri;
+    debouncedProcessCurrentTrack();
+});
+
 async function getTokens() {
     return await api.storage.local.get(["authToken", "clientToken"]);
 }
@@ -175,24 +182,22 @@ async function processTracks() {
     tracks.forEach((track, i) => updateHeartButton(track, savedStatus[i], authToken, clientToken));
 }
 
-// Right side panel with currently playing track has to be opened to be able to determine current track uri
 function processCurrentTrack(useCache = true) {
     const playingTrackLink = document.querySelector(playingTrackLinkSelector);
     const widget = document.querySelector(playingTrackWidgetSelector);
     const panel = document.querySelector(panelSelector);
-    const trackUri = extractTrackUri(playingTrackLink);
-    if (playingTrackLink && widget && trackUri) {
+    const trackUri = currentTrackUri || extractTrackUri(playingTrackLink);
+    if (widget && trackUri) {
         getTokens().then(({ authToken, clientToken }) => {
             if (useCache && cache.has(trackUri)) {
                 updateWidgetHeartButton(widget, trackUri, cache.get(trackUri), authToken, clientToken);
-                updatePanelHeartButton(panel, trackUri, cache.get(trackUri), authToken, clientToken);
-            }
-            else checkIfSavedBatch([trackUri], authToken, clientToken).then(statuses => {
+                if (panel) updatePanelHeartButton(panel, trackUri, cache.get(trackUri), authToken, clientToken);
+            } else checkIfSavedBatch([trackUri], authToken, clientToken).then(statuses => {
                 updateWidgetHeartButton(widget, trackUri, statuses[0], authToken, clientToken);
-                updatePanelHeartButton(panel, trackUri, statuses[0], authToken, clientToken);
+                if (panel) updatePanelHeartButton(panel, trackUri, statuses[0], authToken, clientToken);
             });
         });
-    } else if (!playingTrackLink && widget) {
+    } else if (!trackUri && widget) {
         let heart = widget.querySelector(`.${heartBtnClass}`);
         if (heart) {
             heart.style.pointerEvents = "none";
@@ -257,7 +262,11 @@ const bodyObserver = new MutationObserver(mutations => {
     }
 });
 
-bodyObserver.observe(document.body, { childList: true, subtree: true });
+function startObserving() {
+    bodyObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
+if (document.body) startObserving();
+else document.addEventListener("DOMContentLoaded", startObserving);
 
 api.runtime.onMessage.addListener((msg) => {
     if (msg.type === "refreshNeeded") {

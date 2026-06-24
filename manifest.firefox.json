@@ -29,7 +29,18 @@
             ],
             "js": [
                 "content.js"
-            ]
+            ],
+            "run_at": "document_start"
+        },
+        {
+            "matches": [
+                "https://open.spotify.com/*"
+            ],
+            "js": [
+                "inject.js"
+            ],
+            "world": "MAIN",
+            "run_at": "document_start"
         }
     ],
     "web_accessible_resources": [
