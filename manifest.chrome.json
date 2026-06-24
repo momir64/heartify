@@ -15,7 +15,8 @@
     ],
     "host_permissions": [
         "https://open.spotify.com/*",
-        "https://api-partner.spotify.com/*"
+        "https://api-partner.spotify.com/*",
+        "https://spclient.wg.spotify.com/*"
     ],
     "background": {
         "service_worker": "background.js"

@@ -24,19 +24,25 @@ api.webRequest.onBeforeRequest.addListener(
             const decoder = new TextDecoder("utf-8");
             const bodyString = decoder.decode(details.requestBody.raw[0].bytes);
             try {
-                const operationName = JSON.parse(bodyString).operationName;
-                if (operationName && operationName === "libraryV3") {
-                    try {
+                const body = JSON.parse(bodyString);
+                try {
+                    if (body.operationName === "libraryV3")
                         await api.tabs.sendMessage(details.tabId, { type: "refreshNeeded" });
-                    } catch (e) {
-                        console.log("Could not send message to tab", details.tabId);
-                    }
+                    else if (body.entityRequest?.[0]?.entityUri?.startsWith("spotify:track:"))
+                        await api.tabs.sendMessage(details.tabId, { type: "initialTrack", trackUri: body.entityRequest[0].entityUri });
+                } catch (e) {
+                    console.log("Could not send message to tab", details.tabId);
                 }
             } catch (e) {
                 console.error("Failed to parse request body", e);
             }
         }
     },
-    { urls: ["https://api-partner.spotify.com/pathfinder/v2/query"] },
+    {
+        urls: [
+            "https://api-partner.spotify.com/pathfinder/v2/query",
+            "https://spclient.wg.spotify.com/extended-metadata/v0/extended-metadata"
+        ]
+    },
     ["requestBody"]
 );

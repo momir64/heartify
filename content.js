@@ -273,5 +273,8 @@ api.runtime.onMessage.addListener((msg) => {
         cache.clear();
         debouncedProcessTracks();
         debouncedProcessCurrentTrack(false);
+    } else if (msg.type === "initialTrack" && !currentTrackUri) {
+        currentTrackUri = msg.trackUri;
+        debouncedProcessCurrentTrack();
     }
 });
