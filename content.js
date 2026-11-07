@@ -70,7 +70,7 @@ const heartBtnClass = "heart-btn";
 const heartOutline = api.runtime.getURL("/assets/heart_unfilled.svg");
 const heartFilled = api.runtime.getURL("/assets/heart_filled.svg");
 const playingTrackLinkSelector = "a[data-testid='context-link']";
-const playingTrackWidgetSelector = "div[data-testid='now-playing-widget']";
+const playingTrackWidgetSelector = "div[data-testid^='now-playing-widget']:not([data-testid$='-byline'])";
 const panelSelector = "div[data-testid='NPV_Panel_OpenDiv'] > :first-child > div > :last-child";
 const trackRowSelector = "div[data-testid='tracklist-row']";
 const trackLinkSelector = "a[href^='/track/']";
