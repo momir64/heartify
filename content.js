@@ -37,15 +37,16 @@ async function spotifyRequest(trackUris, authToken, clientToken, operationName) 
         }),
         method: "POST",
         mode: "cors"
-    });
-    return res.json();
+    }).catch(() => null);
+    return res?.ok ? res.json().catch(() => null) : null;
 }
 
 const cache = new Map();
 
 async function checkIfSavedBatch(trackUris, authToken, clientToken) {
     const json = await spotifyRequest(trackUris, authToken, clientToken, "areEntitiesInLibrary");
-    const statuses = json?.data?.lookup?.map(item => item?.data?.saved ?? false) ?? [];
+    if (!json?.data?.lookup) return null; // failed lookup, don't cache it as "not liked"
+    const statuses = json.data.lookup.map(item => item?.data?.saved ?? false);
     trackUris.forEach((uri, i) => cache.set(uri, statuses[i]));
     return statuses;
 }
@@ -83,6 +84,7 @@ const supportedSections = [playlistPageSelector, albumPageSelector, artistPageSe
 const addToPlaylistBtnSelector = "button[aria-label='Add to playlist']";
 const addToLikedSongsBtnSelector = "button[aria-label='Add to Liked Songs']";
 const addBtnSelector = `${addToPlaylistBtnSelector}, ${addToLikedSongsBtnSelector}`;
+const trackOrAddBtnSelector = `${trackLinkSelector}, ${addBtnSelector}`;
 
 function getTracks() {
     return Array.from(
@@ -179,6 +181,7 @@ async function processTracks() {
     tracks.filter(t => cache.has(t.uri)).forEach(t => updateHeartButton(t, cache.get(t.uri), authToken, clientToken));
 
     const savedStatus = await checkIfSavedBatch(tracks.map(t => t.uri), authToken, clientToken);
+    if (!savedStatus) return;
     tracks.forEach((track, i) => updateHeartButton(track, savedStatus[i], authToken, clientToken));
 }
 
@@ -193,6 +196,7 @@ function processCurrentTrack(useCache = true) {
                 updateWidgetHeartButton(widget, trackUri, cache.get(trackUri), authToken, clientToken);
                 if (panel) updatePanelHeartButton(panel, trackUri, cache.get(trackUri), authToken, clientToken);
             } else checkIfSavedBatch([trackUri], authToken, clientToken).then(statuses => {
+                if (!statuses) return;
                 updateWidgetHeartButton(widget, trackUri, statuses[0], authToken, clientToken);
                 if (panel) updatePanelHeartButton(panel, trackUri, statuses[0], authToken, clientToken);
             });
@@ -225,7 +229,7 @@ function observeSection(node) {
             for (const { type, addedNodes, target, attributeName } of mutations) {
                 if (type === "childList") {
                     for (const node of addedNodes) {
-                        if (node.nodeType === Node.ELEMENT_NODE && (node.matches?.(trackLinkSelector) || node.querySelector?.(trackLinkSelector))) {
+                        if (node.nodeType === Node.ELEMENT_NODE && (node.matches?.(trackOrAddBtnSelector) || node.querySelector?.(trackOrAddBtnSelector))) {
                             debouncedProcessTracks();
                             return;
                         }
@@ -275,6 +279,13 @@ api.runtime.onMessage.addListener((msg) => {
         debouncedProcessCurrentTrack(false);
     } else if (msg.type === "initialTrack" && !currentTrackUri) {
         currentTrackUri = msg.trackUri;
+        debouncedProcessCurrentTrack();
+    }
+});
+
+api.storage.onChanged.addListener((changes) => {
+    if (changes.authToken) {
+        debouncedProcessTracks();
         debouncedProcessCurrentTrack();
     }
 });
